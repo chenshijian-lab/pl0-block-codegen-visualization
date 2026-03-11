@@ -80,4 +80,4 @@ target code is the incremental output
 
 ## License
 
-MIT License
+GNU GPL 3.0 License
