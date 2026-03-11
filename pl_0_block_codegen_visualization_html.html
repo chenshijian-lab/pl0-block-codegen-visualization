@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PL/0 BLOCK 目标代码生成可视化</title>
+<style>
+  :root {
+    --bg: #eef5ff;
+    --card: #ffffff;
+    --line: #d8e3f3;
+    --text: #18304a;
+    --sub: #5f7590;
+    --blue: #2f80ed;
+    --blue-soft: #ebf3ff;
+    --green: #2e9e4d;
+    --green-soft: #eefcf1;
+    --orange: #f2994a;
+    --orange-soft: #fff4e7;
+    --purple: #8a5cf6;
+    --purple-soft: #f2ecff;
+    --red: #d9534f;
+    --red-soft: #fff0ef;
+    --yellow-soft: #fff9ec;
+    --shadow: 0 14px 36px rgba(25, 63, 114, 0.08);
+    --radius: 20px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(circle at top left, rgba(132, 188, 255, 0.24), transparent 26%),
+      linear-gradient(180deg, #f3f8ff 0%, #eef5ff 45%, #f7fbff 100%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+                 "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+  }
+
+  body {
+    min-width: 1280px;
+  }
+
+  .page {
+    max-width: 1840px;
+    margin: 0 auto;
+    padding: 22px 22px 30px;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    box-shadow: var(--shadow);
+    padding: 26px 28px 22px;
+  }
+
+  .hero h1 {
+    margin: 0 0 8px;
+    font-size: 34px;
+    line-height: 1.2;
+    letter-spacing: 0.3px;
+  }
+
+  .hero p {
+    margin: 0;
+    color: var(--sub);
+    font-size: 16px;
+    line-height: 1.75;
+  }
+
+  .hero .hint {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: var(--yellow-soft);
+    border: 1px solid #f1dfaa;
+    color: #7c5e00;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .controls {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .controls button {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--text);
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(32, 74, 135, 0.06);
+  }
+
+  .controls button:hover {
+    background: #f8fbff;
+  }
+
+  .controls .primary {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+  }
+
+  .controls .step-label {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text);
+    min-width: 130px;
+  }
+
+  .range-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 420px;
+    padding: 0 4px;
+  }
+
+  .range-wrap input[type=range] {
+    width: 100%;
+    accent-color: var(--blue);
+  }
+
+  .progress-text {
+    color: var(--sub);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .detail-card {
+    margin-top: 18px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    padding: 22px 24px;
+  }
+
+  .detail-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .detail-top h2 {
+    margin: 0;
+    font-size: 24px;
+    line-height: 1.45;
+  }
+
+  .meta-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--text);
+  }
+
+  .pill.blue { background: var(--blue-soft); border-color: #cfe1ff; color: #0a5fc7; }
+  .pill.green { background: var(--green-soft); border-color: #cfe8d5; color: #1d7a38; }
+  .pill.orange { background: var(--orange-soft); border-color: #f2d2ad; color: #9d5a10; }
+  .pill.purple { background: var(--purple-soft); border-color: #ddcdfc; color: #6439cb; }
+  .pill.red { background: var(--red-soft); border-color: #f5c7c5; color: #b13b36; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .detail-box {
+    background: #fbfdff;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 14px 16px;
+  }
+
+  .detail-box h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--sub);
+  }
+
+  .detail-box p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .workspace {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1.1fr 110px 1.08fr 110px 1.3fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .bridge {
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    align-self: stretch;
+  }
+
+  .bridge .bridge-label {
+    width: 100%;
+    padding: 12px 10px;
+    text-align: center;
+    border-radius: 18px;
+    background: #ffffff;
+    border: 1px solid var(--line);
+    box-shadow: 0 8px 18px rgba(34, 78, 133, 0.08);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.55;
+  }
+
+  .bridge .arrow {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #ffffff 0%, #eaf3ff 100%);
+    border: 1px solid #cfe1ff;
+    color: var(--blue);
+    font-size: 34px;
+    font-weight: 900;
+    box-shadow: 0 8px 20px rgba(47, 128, 237, 0.12);
+  }
+
+  .panel {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid #e4ecf8;
+    background: linear-gradient(180deg, rgba(235,243,255,0.8) 0%, rgba(255,255,255,0.95) 100%);
+  }
+
+  .panel-header h3 {
+    margin: 0;
+    font-size: 22px;
+  }
+
+  .panel-header p {
+    margin: 8px 0 0;
+    color: var(--sub);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .source-wrap {
+    padding: 12px 14px 18px;
+  }
+
+  .source-line {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 10px;
+    align-items: stretch;
+    padding: 3px 6px;
+    border-radius: 12px;
+    margin-bottom: 4px;
+    position: relative;
+  }
+
+  .source-line .ln {
+    color: var(--sub);
+    text-align: right;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 14px;
+    padding-top: 4px;
+  }
+
+  .source-line .code {
+    padding: 4px 10px;
+    border-radius: 10px;
+    white-space: pre;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .source-line.active {
+    background: #eef5ff;
+    outline: 2px solid #cfe1ff;
+  }
+
+  .source-line.active .code {
+    background: #ffffff;
+    box-shadow: inset 0 0 0 1px #dce9ff;
+  }
+
+  .source-line.touched .code {
+    color: #1e4062;
+  }
+
+  .source-line.pending .code {
+    color: #8aa0b9;
+  }
+
+  .source-line .token-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    vertical-align: middle;
+    border: 1px solid transparent;
+  }
+
+  .token-keyword { background: #edf6ff; border-color: #cfe1ff; color: #0b67d1; }
+  .token-ident { background: #eefcf1; border-color: #cfe8d5; color: #227542; }
+  .token-emit { background: #fff2eb; border-color: #ffd7bf; color: #b55d1d; }
+  .token-fill { background: #f3eeff; border-color: #dfd1ff; color: #6d3cd8; }
+  .token-loop { background: #fff8e8; border-color: #f3dfaa; color: #8e6b00; }
+
+  .compiler-zone {
+    padding: 14px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .flow-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .flow-card .title {
+    padding: 12px 14px;
+    font-size: 15px;
+    font-weight: 800;
+    border-bottom: 1px solid #ebf0f7;
+    background: #f8fbff;
+  }
+
+  .flow-card .body {
+    padding: 14px;
+  }
+
+  .stack-mini {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mini-box {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fbfdff;
+    padding: 10px 12px;
+  }
+
+  .mini-box .name {
+    font-size: 12px;
+    color: var(--sub);
+    margin-bottom: 4px;
+  }
+
+  .mini-box .value {
+    font-family: Consolas, Monaco, monospace;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--text);
+  }
+
+  .compiler-flow {
+    display: grid;
+    gap: 10px;
+  }
+
+  .flow-step {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .flow-step .num {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #edf5ff;
+    color: #0c67cf;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 800;
+    border: 1px solid #d7e7ff;
+  }
+
+  .flow-step .txt {
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .flow-highlight {
+    border-left: 5px solid var(--blue);
+    background: #f5faff;
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-top: 8px;
+    font-size: 14px;
+    line-height: 1.85;
+  }
+
+  .table-wrap {
+    padding: 10px 14px 18px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    border-bottom: 1px solid #e6eef9;
+    padding: 10px 10px;
+    font-size: 14px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: #f8fbff;
+    color: var(--sub);
+    font-size: 13px;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  tr.active-row td {
+    background: #f2f8ff;
+  }
+
+  tr.new-row td {
+    background: #eefcf1;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid transparent;
+  }
+
+  .tag.const { background: #edf6ff; color: #0b67d1; border-color: #cfe1ff; }
+  .tag.var { background: #eefcf1; color: #227542; border-color: #cfe8d5; }
+  .tag.proc { background: #f2ecff; color: #6d3cd8; border-color: #dfd1ff; }
+  .tag.patch { background: #fff4e7; color: #a05a12; border-color: #f3d3af; }
+
+  .codegen-wrap {
+    padding: 10px 14px 18px;
+  }
+
+  .code-list {
+    display: grid;
+    gap: 4px;
+  }
+
+  .code-row {
+    display: grid;
+    grid-template-columns: 64px 170px 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 7px 10px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+  }
+
+  .code-row .addr {
+    font-family: Consolas, Monaco, monospace;
+    color: var(--sub);
+    font-size: 14px;
+  }
+
+  .code-row .ins {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .code-row .explain {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #39506b;
+  }
+
+  .code-row.generated {
+    background: #fbfdff;
+    border-color: #e4edf9;
+  }
+
+  .code-row.current {
+    background: #eef5ff;
+    border-color: #cfe1ff;
+    box-shadow: inset 0 0 0 1px #d9e8ff;
+  }
+
+  .code-row.backpatched {
+    background: #fff8e8;
+    border-color: #f3dfaa;
+  }
+
+  .legend {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .legend-box {
+    background: #ffffff;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+
+  .legend-box h4 {
+    margin: 0 0 10px;
+    font-size: 15px;
+  }
+
+  .legend-box p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #4f6783;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 9px;
+    font-size: 13px;
+  }
+
+  .swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+    border: 1px solid #dbe8f8;
+  }
+
+  .footer-note {
+    margin-top: 18px;
+    padding: 16px 18px;
+    background: #ffffff;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    color: #4f6783;
+    line-height: 1.85;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>PL/0 编译器中 BLOCK 过程的目标代码生成可视化</h1>
+      <p>
+        这个页面把“源代码扫描 → 符号表登记 → gen() 生成 P-code → 回填跳转地址”这一整条链条做成了动态教学演示。
+        你可以看到，编译器并不是一下子生成全部目标代码，而是在 <b>BLOCK 递归运行</b>、一边向前扫描源程序、
+        一边维护 <b>table</b> 和 <b>cx</b>，再把一行一行 P-code 逐步发射出来。
+      </p>
+      <div class="hint">建议先按“下一步”慢慢走，再按“自动播放”观察整体节奏。</div>
+      <div class="controls">
+        <button id="prevBtn">上一步</button>
+        <button id="nextBtn" class="primary">下一步</button>
+        <button id="playBtn">自动播放</button>
+        <button id="resetBtn">重置</button>
+        <div class="step-label" id="stepLabel">步骤 1</div>
+        <div class="range-wrap">
+          <input id="stepRange" type="range" min="0" max="0" step="1" value="0" />
+          <div class="progress-text" id="progressText">1 / 1</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="detail-card">
+      <div class="detail-top">
+        <div>
+          <h2 id="stepTitle">步骤标题</h2>
+        </div>
+        <div class="meta-pills" id="metaPills"></div>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-box">
+          <h3>当前扫描位置</h3>
+          <p id="scanText"></p>
+        </div>
+        <div class="detail-box">
+          <h3>当前 BLOCK / 作用域</h3>
+          <p id="scopeText"></p>
+        </div>
+        <div class="detail-box">
+          <h3>正在做什么</h3>
+          <p id="actionText"></p>
+        </div>
+        <div class="detail-box">
+          <h3>本步关键产出</h3>
+          <p id="resultText"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <section class="panel">
+        <div class="panel-header">
+          <h3>源代码扫描窗口</h3>
+          <p>高亮的行表示 BLOCK 当前处理的源代码位置。绿色提示常表示登记，橙色提示常表示 gen() 生成代码，紫色提示常表示回填。</p>
+        </div>
+        <div class="source-wrap" id="sourceWrap"></div>
+      </section>
+
+      <div class="bridge">
+        <div class="bridge-label" id="bridgeLeftLabel">源程序中的声明或语句<br>被编译器识别</div>
+        <div class="arrow">➜</div>
+        <div class="bridge-label" id="bridgeLeftDetail">名字、层次、地址、常量值<br>进入符号表或进入语句翻译流程</div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>BLOCK 内部运行视图</h3>
+          <p>这里模拟 BLOCK 在运行时维护的几个关键状态：层次 lev、数据段起始 dx、下一条代码位置 cx，以及“当前正在做的编译动作”。</p>
+        </div>
+        <div class="compiler-zone">
+          <div class="flow-card">
+            <div class="title">BLOCK 当前状态</div>
+            <div class="body">
+              <div class="stack-mini">
+                <div class="mini-box">
+                  <div class="name">lev</div>
+                  <div class="value" id="levValue">0</div>
+                </div>
+                <div class="mini-box">
+                  <div class="name">dx</div>
+                  <div class="value" id="dxValue">0</div>
+                </div>
+                <div class="mini-box">
+                  <div class="name">cx</div>
+                  <div class="value" id="cxValue">0</div>
+                </div>
+                <div class="mini-box">
+                  <div class="name">tx / table 大小</div>
+                  <div class="value" id="txValue">0</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-card">
+            <div class="title">本步编译动作</div>
+            <div class="body">
+              <div class="compiler-flow" id="compilerFlow"></div>
+              <div class="flow-highlight" id="flowHighlight"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="bridge">
+        <div class="bridge-label" id="bridgeRightLabel">经由查表、层差计算、地址决定<br>调用 gen(f, l, a)</div>
+        <div class="arrow">➜</div>
+        <div class="bridge-label" id="bridgeRightDetail">目标代码一行行写入 code[]<br>有些地址先占位，稍后再回填</div>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>符号表与目标代码</h3>
+          <p>上半部分是 table，中间展示登记项变化；下半部分是生成中的 P-code。黄色高亮表示当前生成或被回填的代码行。</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 64px;">序号</th>
+                <th style="width: 110px;">名字</th>
+                <th style="width: 90px;">种类</th>
+                <th style="width: 70px;">层</th>
+                <th style="width: 90px;">值</th>
+                <th style="width: 90px;">地址</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody id="symbolBody"></tbody>
+          </table>
+        </div>
+        <div class="codegen-wrap">
+          <div class="code-list" id="codeList"></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="legend">
+      <div class="legend-box">
+        <h4>源代码区颜色</h4>
+        <div class="legend-item"><span class="swatch" style="background:#eef5ff"></span>当前正在扫描的行</div>
+        <div class="legend-item"><span class="swatch" style="background:#ffffff"></span>已经经过但此刻不在焦点中的行</div>
+        <div class="legend-item"><span class="swatch" style="background:#fbfdff"></span>尚未处理的行</div>
+      </div>
+      <div class="legend-box">
+        <h4>符号表变化</h4>
+        <div class="legend-item"><span class="swatch" style="background:#eefcf1"></span>本步新增登记项</div>
+        <div class="legend-item"><span class="swatch" style="background:#f2f8ff"></span>本步关注到的旧项</div>
+        <p>例如：登记常量 a，登记变量 b、c，登记过程 p，并在过程体编译后回填 p 的入口地址。</p>
+      </div>
+      <div class="legend-box">
+        <h4>目标代码变化</h4>
+        <div class="legend-item"><span class="swatch" style="background:#eef5ff"></span>本步新生成的代码</div>
+        <div class="legend-item"><span class="swatch" style="background:#fff8e8"></span>本步发生回填的代码</div>
+        <p>while 的 jpc 与最开始的 jump，往往都是“先占位，后回填”的典型例子。</p>
+      </div>
+      <div class="legend-box">
+        <h4>教学上的核心主线</h4>
+        <p>
+          编译器并不是“先全部看懂，再一次性输出”。它是在顺序扫描中不断把局部信息保存到符号表，
+          再依赖这些信息一行行产生目标代码。<br><br>
+          也就是说，<b>源代码是输入流</b>，<b>符号表是中间记忆</b>，<b>目标代码是持续输出</b>。
+        </p>
+      </div>
+    </section>
+
+    <section class="footer-note" id="footerNote"></section>
+  </div>
+
+<script>
+const sourceLines = [
+  { text: 'const a = 10;', badges: ['keyword:常量声明', 'ident:登记名字 a'] },
+  { text: 'var b, c;', badges: ['keyword:变量声明', 'ident:登记 b、c'] },
+  { text: 'procedure p;', badges: ['keyword:过程声明', 'ident:登记过程名 p'] },
+  { text: 'begin', badges: ['keyword:进入过程体'] },
+  { text: '  c := b + a;', badges: ['emit:生成赋值相关代码'] },
+  { text: 'end;', badges: ['emit:过程体结束'] },
+  { text: 'begin', badges: ['keyword:主程序开始'] },
+  { text: '  read(b);', badges: ['emit:输入语句翻译'] },
+  { text: '  while b # 0 do', badges: ['loop:循环条件', 'fill:后续回填出口'] },
+  { text: '  begin', badges: ['keyword:循环体开始'] },
+  { text: '    call p;', badges: ['emit:调用过程 p'] },
+  { text: '    write(2*c);', badges: ['emit:表达式求值并输出'] },
+  { text: '    read(b);', badges: ['emit:再次输入 b'] },
+  { text: '  end', badges: ['loop:回跳到循环入口'] },
+  { text: 'end.', badges: ['emit:主程序结束'] },
+];
+
+const steps = [
+  {
+    title: 'BLOCK 进入主程序层，初始化 dx、tx、cx，并预留主程序跳转位',
+    scanLine: 0,
+    scope: '主程序 BLOCK，lev = 0',
+    action: 'BLOCK 开始运行。它先把 dx 初始化为 3，为静态链、动态链、返回地址预留空间；同时记录当前 cx，先发射一条 jmp 作为“主程序入口占位”。',
+    result: 'code[0] 先生成 jmp 0 ?，稍后主程序正式入口确定后再回填。',
+    lev: 0, dx: 3, cx: 1,
+    tx: 0,
+    sourceTouched: [0],
+    focusTags: [ ['blue','BLOCK启动'], ['orange','先占位'], ['purple','待回填'] ],
+    flow: [
+      '进入 BLOCK 以后，先建立本层编译环境。',
+      '把 dx 设为 3，表示本层活动记录最前面保留三个管理单元。',
+      '调用 gen(jmp, 0, 0)，给主程序入口留一个坑位。'
+    ],
+    flowHighlight: '这里非常关键：编译器还没有开始翻译主程序语句，却已经先生成了一条跳转指令。这说明目标代码生成不是“完全理解之后一次性输出”，而是随着 BLOCK 的推进逐步发射。',
+    symbols: [],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '预留主程序入口，等待回填', state: 'current' }
+    ],
+    bridgeLeft: ['遇到一个新的 BLOCK', '初始化局部编译状态'],
+    bridgeRight: ['先在 code[] 中占一个位置', '以后知道入口地址时再改写'],
+    footer: '你可以把这一步理解成：BLOCK 刚刚上电，先在目标代码里留一根“将来跳到主程序入口”的钉子。'
+  },
+  {
+    title: '扫描 const 声明，常量 a 进入符号表',
+    scanLine: 0,
+    scope: '主程序 BLOCK，正在处理声明部分',
+    action: '识别到 const a = 10。编译器不为常量 a 分配运行栈空间，而是在 table 中登记它的名字、类别、值、层次。',
+    result: '符号表加入 a：kind = const，val = 10。',
+    lev: 0, dx: 3, cx: 1,
+    tx: 1,
+    sourceTouched: [0],
+    focusTags: [ ['green','登记常量'], ['blue','table更新'] ],
+    flow: [
+      '顺序扫描到 const 声明。',
+      '在 table 中登记名字 a。',
+      '记录 a 是常量，值是 10，层次是 0。'
+    ],
+    flowHighlight: '常量的信息没有直接变成一条目标代码，而是先进入符号表。以后表达式里遇到 a，编译器会查表知道“它不是变量地址，而是常量 10”。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量声明登记', state: 'new' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '预留主程序入口，等待回填', state: 'generated' }
+    ],
+    bridgeLeft: ['源代码中的 a=10 被识别', '语义信息进入符号表'],
+    bridgeRight: ['此时还不需要生成实际执行代码', '后续表达式翻译时再使用'],
+    footer: '这一类信息流是“源代码 → 符号表”，暂时还没有进入目标代码。'
+  },
+  {
+    title: '扫描 var 声明，变量 b、c 进入符号表并分配相对地址',
+    scanLine: 1,
+    scope: '主程序 BLOCK，正在处理变量说明',
+    action: '识别到 var b, c。对变量来说，需要给它们在当前层的数据段中分配相对地址，因此登记 table 的同时 dx 递增。',
+    result: 'b 分配 addr=3，c 分配 addr=4，dx 从 3 增长到 5。',
+    lev: 0, dx: 5, cx: 1,
+    tx: 3,
+    sourceTouched: [0,1],
+    focusTags: [ ['green','登记变量'], ['orange','dx增长'] ],
+    flow: [
+      '扫描变量名 b。',
+      '在 table 中记录 b 是变量，位于 lev 0，addr 3。dx++。',
+      '再扫描 c，记录 addr 4。dx++。'
+    ],
+    flowHighlight: '这里出现了另一种重要信息：变量既要进符号表，又会影响 BLOCK 当前的 dx。也就是说，扫描声明会改变“以后生成代码时的地址解释方式”。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量声明登记', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '变量 b 的相对地址', state: 'new' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '变量 c 的相对地址', state: 'new' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '预留主程序入口，等待回填', state: 'generated' }
+    ],
+    bridgeLeft: ['变量名被识别出来', '名字和地址一起进入 table'],
+    bridgeRight: ['目前仍未直接发射执行指令', '但以后 lod/sto 会依赖这些地址'],
+    footer: '到这里为止，a、b、c 的语义身份已经固定了：a 是常量，b、c 是变量。以后扫描到这些名字时，编译器会依据 table 做不同翻译。'
+  },
+  {
+    title: '扫描 procedure p，先把过程名 p 登记到符号表',
+    scanLine: 2,
+    scope: '主程序 BLOCK，发现嵌套过程声明',
+    action: '识别到 procedure p。编译器先在 table 中登记 p，记录它是一个过程名，但它的入口地址此时还没有最终确定。',
+    result: '符号表加入 p：kind = proc，level = 0，addr 暂时待定。',
+    lev: 0, dx: 5, cx: 1,
+    tx: 4,
+    sourceTouched: [0,1,2],
+    focusTags: [ ['green','登记过程'], ['purple','入口待定'] ],
+    flow: [
+      '扫描到过程头 procedure p。',
+      '先把 p 放进 table。',
+      '接下来会递归调用 BLOCK 编译 p 的过程体。'
+    ],
+    flowHighlight: '这里再次体现“名字先登记，细节后补齐”。过程名 p 先出现在 table 中，后面 process body 编译完成后，才真正知道它的入口地址。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量声明登记', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '变量 b 的相对地址', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '变量 c 的相对地址', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: '?', note: '过程入口地址待回填', state: 'new' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '预留主程序入口，等待回填', state: 'generated' }
+    ],
+    bridgeLeft: ['过程名 p 被识别', '先进入 table'],
+    bridgeRight: ['真正的目标代码要在进入子 BLOCK 后逐步产生', '过程入口还没定'],
+    footer: '很多学生以为“过程地址天然已知”，其实不是。它是编译器递归进入子 BLOCK 以后才逐步确定的。'
+  },
+  {
+    title: '递归进入过程 p 的 BLOCK，并先为过程体预留一条跳转指令',
+    scanLine: 3,
+    scope: '过程 p 的 BLOCK，lev = 1',
+    action: '对过程 p 调用 BLOCK(lev+1)。进入新层后，dx 再次从 3 开始。和主程序一样，过程体也先在 code[] 中留一条 jmp 占位，稍后回填到过程语句入口。',
+    result: 'code[1] 生成 jmp 0 ?，这是过程 p 的内部入口占位。',
+    lev: 1, dx: 3, cx: 2,
+    tx: 4,
+    sourceTouched: [0,1,2,3],
+    focusTags: [ ['blue','递归进入子BLOCK'], ['orange','过程入口占位'] ],
+    flow: [
+      '调用子 BLOCK 编译过程 p。',
+      '建立新层局部编译状态：lev=1，dx=3。',
+      '调用 gen(jmp, 0, 0)，给过程体入口先占位。'
+    ],
+    flowHighlight: '主程序 BLOCK 和过程 BLOCK 的结构是相似的。也就是说，BLOCK 本身就是一个“会递归工作的代码生成器框架”。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '外层常量，可被内层查到', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '外层变量，可由层差访问', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '外层变量，可由层差访问', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: '?', note: '此刻正在编译 p 的过程体', state: 'active' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '主程序入口预留，待回填', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 ?', explain: '过程 p 的语句入口预留，待回填', state: 'current' }
+    ],
+    bridgeLeft: ['从 procedure p 进入其过程体', '扫描进入新层'],
+    bridgeRight: ['新的 BLOCK 再次开始逐行产出代码', '形成递归结构'],
+    footer: '这一刻很适合给学生强调：源代码里一个嵌套过程，会在编译器内部对应一次新的 BLOCK 递归调用。'
+  },
+  {
+    title: '过程 p 的声明部分结束，回填过程入口，并生成 INT 0 3',
+    scanLine: 3,
+    scope: '过程 p 的 BLOCK，准备翻译语句体',
+    action: '由于 p 内部没有 const/var 声明，所以此时真正的过程体入口已经知道了。编译器先把 code[1] 的 jmp 回填到 2，然后生成 INT 0 3，为过程活动记录开辟空间。',
+    result: 'code[1] 回填为 jmp 0 2，code[2] 生成 int 0 3。',
+    lev: 1, dx: 3, cx: 3,
+    tx: 4,
+    sourceTouched: [3],
+    focusTags: [ ['purple','回填过程入口'], ['orange','生成INT'] ],
+    flow: [
+      '子 BLOCK 的声明处理完毕。',
+      '把先前占位的 jmp 改成 jmp 0 2。',
+      '再生成 int 0 3，给过程 p 开辟 3 个管理单元。'
+    ],
+    flowHighlight: '先回填入口，再生成 INT，是典型的 BLOCK 布局模式。过程体真正开始执行时，首先要先拥有自己的活动记录框架。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '外层常量', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '外层变量', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '外层变量', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '过程入口地址已确定', state: 'active' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '主程序入口预留，待回填', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '回填到过程 p 的语句入口', state: 'backpatched' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟活动记录空间', state: 'current' }
+    ],
+    bridgeLeft: ['BLOCK 已完成过程内声明扫描', '入口地址正式确定'],
+    bridgeRight: ['占位指令被改写', '接着发射开辟空间指令'],
+    footer: '这一步可以直观看到：目标代码中的某一行，并不是一生成就永远不变，有时会被后面的信息“回头修正”。'
+  },
+  {
+    title: '扫描过程体语句 c := b + a，先生成 lod 1 3',
+    scanLine: 4,
+    scope: '过程 p 的 BLOCK，正在翻译赋值语句',
+    action: '遇到右部表达式 b + a。先查表找到 b 是外层 lev 0 的变量，当前层 lev 1 访问它时层差为 1，因此生成 lod 1 3。',
+    result: 'code[3] = lod 1 3，把外层变量 b 的值装入栈顶。',
+    lev: 1, dx: 3, cx: 4,
+    tx: 4,
+    sourceTouched: [4],
+    focusTags: [ ['blue','查表'], ['orange','生成lod'], ['green','层差=1'] ],
+    flow: [
+      '识别赋值右部的第一个因子 b。',
+      '查 table 知道 b 是 lev 0、addr 3 的变量。',
+      '当前在 lev 1，所以层差 = 1 - 0 = 1，生成 lod 1 3。'
+    ],
+    flowHighlight: '这就是“名字 → 表项 → 目标代码参数”的最典型路径。源代码里只写了 b，但最后发射出来的却是 lod 1 3。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量 a 将在下一步使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '本步被读取，层差 1', state: 'active' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '最终赋值目标', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '过程入口', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '主程序入口预留，待回填', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取外层变量 b 到栈顶', state: 'current' }
+    ],
+    bridgeLeft: ['源代码中的标识符 b 被识别', '通过符号表定位到 lev 0, addr 3'],
+    bridgeRight: ['把语义转成 lod 1 3', '写入目标代码'],
+    footer: '这一步特别适合强调：符号表的价值，不只是“记名字”，而是把名字翻译成机器可执行的地址参数。'
+  },
+  {
+    title: '继续翻译 b + a，常量 a 生成 lit 0 10',
+    scanLine: 4,
+    scope: '过程 p 的 BLOCK，继续翻译表达式',
+    action: '扫描到 a。查表得知 a 是常量 10，所以不是生成 lod，而是直接生成 lit 0 10，把常数压栈。',
+    result: 'code[4] = lit 0 10。',
+    lev: 1, dx: 3, cx: 5,
+    tx: 4,
+    sourceTouched: [4],
+    focusTags: [ ['blue','查表'], ['orange','生成lit'], ['green','常量翻译'] ],
+    flow: [
+      '识别表达式中的 a。',
+      '查 table 知道 a 是常量，值为 10。',
+      '生成 lit 0 10，把常数压入栈顶。'
+    ],
+    flowHighlight: '同样是名字 a、b，翻译结果却完全不同。原因不是源代码字面不同，而是 table 中记录的“类别”不同。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '本步以常量形式被使用', state: 'active' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '前一步已读入栈', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '赋值目标', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '过程入口', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '主程序入口预留，待回填', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取外层变量 b 到栈顶', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '把常量 a 的值 10 压栈', state: 'current' }
+    ],
+    bridgeLeft: ['标识符 a 被识别', '查表后发现它是常量 10'],
+    bridgeRight: ['直接生成 lit 0 10', '而不是访问内存地址'],
+    footer: '这一步非常能说明：目标代码的形式来自语义判断，而不是仅来自词法表面。'
+  },
+  {
+    title: '生成加法指令 opr 0 2，把 b 与 a 相加',
+    scanLine: 4,
+    scope: '过程 p 的 BLOCK，完成表达式求值',
+    action: '右部两个操作数都已经按次序压入栈顶，此时根据 + 运算符生成 opr 0 2，表示做加法。',
+    result: 'code[5] = opr 0 2。',
+    lev: 1, dx: 3, cx: 6,
+    tx: 4,
+    sourceTouched: [4],
+    focusTags: [ ['orange','生成opr'], ['blue','栈式求值'] ],
+    flow: [
+      '表达式 b + a 的两个操作数已经入栈。',
+      '遇到 +，生成对应的算术操作码。',
+      '发射 opr 0 2，让运行时从栈顶取两个值相加。'
+    ],
+    flowHighlight: 'PL/0 的 P-code 是栈式代码，所以“先装操作数，后发运算符”是一个很鲜明的结构。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量供表达式使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '变量供表达式使用', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '结果将写回 c', state: 'active' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '过程入口', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '主程序入口预留，待回填', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取外层变量 b 到栈顶', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '把常量 10 压栈', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '执行加法，把 b 与 a 相加', state: 'current' }
+    ],
+    bridgeLeft: ['源代码中的 + 被识别', '编译器知道两侧操作数已准备好'],
+    bridgeRight: ['生成统一的算术操作码 opr 0 2', '交给运行时栈机执行'],
+    footer: '赋值语句右边的表达式，到这一刻才真正完成了“从源代码结构到栈机指令序列”的翻译。'
+  },
+  {
+    title: '生成 sto 1 4，把结果写回外层变量 c',
+    scanLine: 4,
+    scope: '过程 p 的 BLOCK，完成赋值语句',
+    action: '赋值左边是 c。查表知 c 是外层 lev 0 的变量，地址 4。当前层 lev 1 访问它的层差为 1，因此生成 sto 1 4。',
+    result: 'code[6] = sto 1 4，赋值语句翻译完成。',
+    lev: 1, dx: 3, cx: 7,
+    tx: 4,
+    sourceTouched: [4],
+    focusTags: [ ['blue','查表'], ['orange','生成sto'], ['green','层差=1'] ],
+    flow: [
+      '识别赋值左部 c。',
+      '查表得知 c 是外层变量，addr 4。',
+      '生成 sto 1 4，把栈顶结果存回 c。'
+    ],
+    flowHighlight: '赋值左部与右部都依赖查表，但右部通常生成 lod 或 lit，左部则往往生成 sto。它们的“方向”不同。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '过程体中作为常量使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '过程体中作为右值使用', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '本步作为左值写回', state: 'active' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '过程入口', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '主程序入口预留，待回填', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取外层变量 b 到栈顶', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '把常量 10 压栈', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '执行加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '把结果写回外层变量 c', state: 'current' }
+    ],
+    bridgeLeft: ['左值 c 被识别', '查表定位到 addr 4'],
+    bridgeRight: ['生成写回指令 sto 1 4', '完成赋值'],
+    footer: '到这里，过程 p 的核心语句 c := b + a 已经完整变成了一段 P-code。'
+  },
+  {
+    title: '过程体结束，生成 opr 0 0 作为返回指令',
+    scanLine: 5,
+    scope: '过程 p 的 BLOCK，准备退出',
+    action: '过程体语句编译完毕。按照 PL/0 约定，BLOCK 在末尾生成 opr 0 0，表示过程返回。',
+    result: 'code[7] = opr 0 0。过程 p 的目标代码生成完成。',
+    lev: 1, dx: 3, cx: 8,
+    tx: 4,
+    sourceTouched: [4,5],
+    focusTags: [ ['orange','生成返回'], ['blue','过程结束'] ],
+    flow: [
+      '遇到过程体结束 end;。',
+      'BLOCK 在本层代码末尾自动补上一条返回指令。',
+      '子 BLOCK 编译结束，准备回到外层 BLOCK。'
+    ],
+    flowHighlight: '这一步说明：并不是只有源代码里写明的语句才会生成代码。像过程返回这样的运行时收尾动作，也会由 BLOCK 自动生成。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '外层常量', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '外层变量', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '外层变量', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '过程 p 已编译完成', state: 'active' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 ?', explain: '主程序入口预留，待回填', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'current' }
+    ],
+    bridgeLeft: ['过程体扫描结束', 'BLOCK 自动补尾'],
+    bridgeRight: ['生成返回指令', '子过程代码段完整闭合'],
+    footer: '教学上可以顺手提醒学生：BLOCK 负责的不只是翻译局部语句，还负责让这段目标代码在运行时“首尾完整”。'
+  },
+  {
+    title: '回到主程序 BLOCK，主程序入口地址确定，回填 code[0] 并生成 INT 0 5',
+    scanLine: 6,
+    scope: '主程序 BLOCK，开始翻译主程序语句体',
+    action: '过程声明已经处理完，主程序语句入口此刻确定为地址 8。因此把最初的 code[0] 回填为 jmp 0 8。然后生成 int 0 5，为主程序分配 5 个栈单元。',
+    result: 'code[0] = jmp 0 8，code[8] = int 0 5。',
+    lev: 0, dx: 5, cx: 9,
+    tx: 4,
+    sourceTouched: [6],
+    focusTags: [ ['purple','回填主程序入口'], ['orange','生成主程序INT'] ],
+    flow: [
+      '返回外层 BLOCK。',
+      '此时已经知道主程序语句体从地址 8 开始，于是回填 code[0]。',
+      '再发射 int 0 5，给主程序 b、c 等开辟空间。'
+    ],
+    flowHighlight: '这一步让整段代码的总体布局清晰起来：先是主程序 jmp 跳过过程代码，下面放过程 p 的代码，再回到主程序入口执行。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '主程序常量', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '主程序变量', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '主程序变量', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '可被 call 的过程入口', state: 'active' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '回填为主程序入口', state: 'backpatched' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟活动记录空间', state: 'current' }
+    ],
+    bridgeLeft: ['外层 BLOCK 现在知道了主程序入口', '准备正式处理 begin...end.'],
+    bridgeRight: ['回填 code[0]', '再生成主程序的 INT'],
+    footer: '从这里开始，目标代码区已经有了一个很完整的形态：前面是跳转，后面是过程代码，再往后才是主程序代码。'
+  },
+  {
+    title: '翻译 read(b)，生成 opr 0 16 读取输入',
+    scanLine: 7,
+    scope: '主程序 BLOCK，处理输入语句',
+    action: '翻译 read(b) 时，先生成读入指令 opr 0 16，让运行时把输入值放到栈顶。',
+    result: 'code[9] = opr 0 16。',
+    lev: 0, dx: 5, cx: 10,
+    tx: 4,
+    sourceTouched: [7],
+    focusTags: [ ['orange','生成输入'], ['blue','read语句'] ],
+    flow: [
+      '识别 read 语句。',
+      'read 的语义是从外部输入一个值。',
+      '先生成 opr 0 16，把输入读到栈顶。'
+    ],
+    flowHighlight: '这一步再次说明：一个源级语句往往会对应多条目标代码。read(b) 不是一条，而是“先读到栈顶，再存入 b”。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '马上要作为 read 目标', state: 'active' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '后续会参与输出', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '后续 while 中会调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '从输入读一个值到栈顶', state: 'current' }
+    ],
+    bridgeLeft: ['read(b) 被识别', 'b 在 table 中已知是变量'],
+    bridgeRight: ['先产生输入动作', '再准备写回变量'],
+    footer: '对初学者来说，这一步很能帮助理解：目标代码并不是直接和“变量名”交互，而是通过栈和指令组合完成。'
+  },
+  {
+    title: '完成 read(b)，生成 sto 0 3，把输入值存入 b',
+    scanLine: 7,
+    scope: '主程序 BLOCK，完成 read(b)',
+    action: '查表找到 b 是本层变量 addr 3，因此 read 的第二步生成 sto 0 3，把刚才读到栈顶的值写入 b。',
+    result: 'code[10] = sto 0 3。',
+    lev: 0, dx: 5, cx: 11,
+    tx: 4,
+    sourceTouched: [7],
+    focusTags: [ ['blue','查表'], ['orange','生成sto'], ['green','本层变量'] ],
+    flow: [
+      '查 table，发现 b 在当前层 lev 0，addr 3。',
+      '因为层差是 0，所以目标代码参数中的 l 为 0。',
+      '生成 sto 0 3，把输入值存入 b。'
+    ],
+    flowHighlight: '同一个变量 b，在不同上下文里会触发不同的翻译：赋值右边时可能是 lod，read 的目标则是 sto。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '本步作为 read 写回目标', state: 'active' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '后续输出用', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '循环体内调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '从输入读一个值到栈顶', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '把输入值存入变量 b', state: 'current' }
+    ],
+    bridgeLeft: ['通过 table 定位 b 的地址', '语义从“变量名”变成“addr=3”'],
+    bridgeRight: ['生成 sto 0 3', '完成 read 语句翻译'],
+    footer: '此时主程序已经拥有初始输入 b 的代码，下面就要开始翻译 while 了。'
+  },
+  {
+    title: '开始翻译 while 条件，记录循环入口地址 11，并生成 lod 0 3',
+    scanLine: 8,
+    scope: '主程序 BLOCK，处理 while 条件 b # 0',
+    action: '翻译 while 时，首先要记住循环条件入口地址 cx1 = 11，以便循环体结束后回跳。接着对条件左侧 b 生成 lod 0 3。',
+    result: '记录循环入口 11，code[11] = lod 0 3。',
+    lev: 0, dx: 5, cx: 12,
+    tx: 4,
+    sourceTouched: [8],
+    focusTags: [ ['blue','记录循环入口'], ['orange','生成lod'], ['purple','未来回跳'] ],
+    flow: [
+      '进入 while 语句。',
+      '把当前 cx 记为 cx1 = 11，表示循环条件入口。',
+      '翻译条件左操作数 b，生成 lod 0 3。'
+    ],
+    flowHighlight: 'while 的代码生成和普通语句不同，它需要额外记住“以后要跳回来”的位置。也就是说，编译器在这里不仅在生成代码，还在记控制流骨架。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '过程 p 中使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '本步作为循环条件左值', state: 'active' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '循环体中输出用', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '循环体中调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b，准备判断 b # 0', state: 'current' }
+    ],
+    bridgeLeft: ['进入 while 结构', '既要翻译表达式又要记录控制流位置'],
+    bridgeRight: ['先把 b 压栈', '为后续比较做准备'],
+    footer: 'while 是理解“目标代码如何表达控制结构”的关键节点。这里已经开始出现显式的跳转框架。'
+  },
+  {
+    title: '继续翻译条件 b # 0，生成 lit 0 0 与 opr 0 9',
+    scanLine: 8,
+    scope: '主程序 BLOCK，完成条件表达式',
+    action: '条件右边是常数 0，因此生成 lit 0 0。之后根据 # 运算符生成比较指令 opr 0 9，表示“不等判断”。',
+    result: 'code[12] = lit 0 0，code[13] = opr 0 9。',
+    lev: 0, dx: 5, cx: 14,
+    tx: 4,
+    sourceTouched: [8],
+    focusTags: [ ['orange','生成lit'], ['orange','生成比较'], ['blue','条件翻译'] ],
+    flow: [
+      '把常数 0 作为条件右操作数压栈。',
+      '识别比较运算符 #。',
+      '生成 opr 0 9，执行“不等于”比较。'
+    ],
+    flowHighlight: '和普通算术表达式一样，条件表达式也是“先压两边，再生成运算符”的栈式模式。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '循环条件参与比较', state: 'active' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '循环体中输出', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '循环体中调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b 与 0 是否不等', state: 'current' }
+    ],
+    bridgeLeft: ['把条件两侧都翻译成栈元素', '再根据 # 生成比较'],
+    bridgeRight: ['形成一个布尔判断结果', '供后续 jpc 使用'],
+    footer: '条件表达式的翻译结果不是“跳转”，而只是一个布尔结果。真正的控制转移要靠下一步的 jpc。'
+  },
+  {
+    title: '为 while 生成条件转移 jpc 0 ?，先占位等待循环出口地址',
+    scanLine: 8,
+    scope: '主程序 BLOCK，while 条件结束，准备进入循环体',
+    action: 'while 的条件已经算完。编译器此刻生成 jpc 0 ?，表示若条件不满足则跳出循环，但出口地址还不知道，所以先占位。记住该位置 cx2 = 14。',
+    result: 'code[14] = jpc 0 ?，等待循环体编译完后回填。',
+    lev: 0, dx: 5, cx: 15,
+    tx: 4,
+    sourceTouched: [8,9],
+    focusTags: [ ['purple','先占位'], ['orange','生成jpc'], ['blue','记录cx2'] ],
+    flow: [
+      '条件值已经在栈顶形成。',
+      '生成条件转移指令 jpc 0 0。',
+      '把它的位置记为 cx2 = 14，稍后循环结束时回填出口。'
+    ],
+    flowHighlight: '这是 while 代码生成里最经典的“未来信息影响当前代码”例子。现在只能知道“要跳出去”，但跳到哪里，要等整个循环体编译结束后才知道。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '过程 p 中使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '循环判断条件', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '循环体输出', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '循环体调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 ?', explain: '若条件不满足则跳出循环，出口待回填', state: 'current' }
+    ],
+    bridgeLeft: ['条件表达式翻译完', '需要接上控制流'],
+    bridgeRight: ['生成 jpc 但先不知跳到哪里', '把地址空着'],
+    footer: '这一行是讲控制流回填最好的示范点。学生只要看懂这一行，就对“先占位后回填”有了很具体的感觉。'
+  },
+  {
+    title: '翻译 call p，查表后生成 cal 0 2',
+    scanLine: 10,
+    scope: '主程序 BLOCK，正在翻译循环体中的 call p',
+    action: '在循环体中遇到 call p。查表可知 p 是 lev 0 的过程，入口地址是 2。当前也在 lev 0，所以层差为 0，生成 cal 0 2。',
+    result: 'code[15] = cal 0 2。',
+    lev: 0, dx: 5, cx: 16,
+    tx: 4,
+    sourceTouched: [8,9,10],
+    focusTags: [ ['blue','查表过程名'], ['orange','生成cal'] ],
+    flow: [
+      '进入 while 的语句体。',
+      '扫描到 call p，查 table 找到 p 的入口地址 2。',
+      '生成 cal 0 2，表示调用过程 p。'
+    ],
+    flowHighlight: '过程声明阶段登记到 table 的信息，此刻终于真正派上了用场。也就是说，前面“先登记过程 p”这件事，本质上是在为这里的 call 做准备。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '过程 p 中使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '循环条件与过程 p 使用', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '过程 p 会写它，后面输出它', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '本步被 call 引用', state: 'active' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 ?', explain: '若条件不满足则跳出循环，出口待回填', state: 'generated' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'current' }
+    ],
+    bridgeLeft: ['call p 从源代码进入编译流程', '借助 table 找到过程入口'],
+    bridgeRight: ['发射 cal 0 2', '把控制转交给过程 p'],
+    footer: '这一步把“声明”与“使用”之间的联系清楚地串起来了：没有前面的 table 记录，就没有这里的 cal 参数。'
+  },
+  {
+    title: '翻译 write(2*c) 的乘法左操作数，生成 lit 0 2',
+    scanLine: 11,
+    scope: '主程序 BLOCK，翻译输出表达式 2*c',
+    action: 'write(2*c) 中先处理表达式 2*c。第一个因子是常量 2，因此生成 lit 0 2。',
+    result: 'code[16] = lit 0 2。',
+    lev: 0, dx: 5, cx: 17,
+    tx: 4,
+    sourceTouched: [11],
+    focusTags: [ ['orange','生成lit'], ['blue','表达式开始'] ],
+    flow: [
+      '识别 write 中的表达式 2*c。',
+      '先处理左因子 2。',
+      '生成 lit 0 2，把 2 压入栈顶。'
+    ],
+    flowHighlight: 'write 语句内部仍然要先翻译一个普通表达式。也就是说，“输出”只是最外层用途，里面的表达式生成逻辑并没有改变。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '由 p 使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '循环控制变量', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '将参与 2*c', state: 'active' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '上一步已调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 ?', explain: '若条件不满足则跳出循环，出口待回填', state: 'generated' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'generated' },
+      { addr: 16, ins: 'lit 0 2', explain: '把常量 2 压栈', state: 'current' }
+    ],
+    bridgeLeft: ['write(2*c) 进入表达式翻译', '常数 2 被直接识别'],
+    bridgeRight: ['生成 lit 0 2', '为后续乘法做准备'],
+    footer: '这里可以继续强化一个直觉：高级语句内部，其实还是会分解成很多细粒度的目标代码动作。'
+  },
+  {
+    title: '继续翻译 2*c，查表后生成 lod 0 4 读取 c',
+    scanLine: 11,
+    scope: '主程序 BLOCK，继续翻译乘法右操作数',
+    action: '乘法的右因子是 c。查表得知 c 是本层变量 addr 4，因此生成 lod 0 4。',
+    result: 'code[17] = lod 0 4。',
+    lev: 0, dx: 5, cx: 18,
+    tx: 4,
+    sourceTouched: [11],
+    focusTags: [ ['blue','查表变量 c'], ['orange','生成lod'] ],
+    flow: [
+      '识别右因子 c。',
+      '查 table，知道 c 在当前层 addr 4。',
+      '生成 lod 0 4，把 c 的值压栈。'
+    ],
+    flowHighlight: '过程 p 在前一步 call 中修改了 c，而这里 write 又读取 c。这能帮助学生体会：目标代码不是孤立一行，而是在共享同一组运行时变量。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '由 p 使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '循环控制', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '本步被读取用于 2*c', state: 'active' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '已用于 call', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 ?', explain: '若条件不满足则跳出循环，出口待回填', state: 'generated' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'generated' },
+      { addr: 16, ins: 'lit 0 2', explain: '把 2 压栈', state: 'generated' },
+      { addr: 17, ins: 'lod 0 4', explain: '读取变量 c 的值', state: 'current' }
+    ],
+    bridgeLeft: ['名字 c 被识别', 'table 给出它的地址信息'],
+    bridgeRight: ['生成 lod 0 4', '为乘法准备第二个操作数'],
+    footer: '很多编译课的一个难点在于，学生脑中没有“名字被翻译成地址”的动态图景，这一步正好能把那个过程可视化。'
+  },
+  {
+    title: '生成乘法与输出指令：opr 0 4，opr 0 14，opr 0 15',
+    scanLine: 11,
+    scope: '主程序 BLOCK，完成 write(2*c)',
+    action: '两个操作数已经入栈，先生成 opr 0 4 做乘法，随后生成 opr 0 14 输出栈顶值，再用 opr 0 15 换行。',
+    result: 'code[18..20] 依次生成乘法、输出、换行。',
+    lev: 0, dx: 5, cx: 21,
+    tx: 4,
+    sourceTouched: [11],
+    focusTags: [ ['orange','连续生成三条'], ['blue','write语句完成'] ],
+    flow: [
+      '发射 opr 0 4，计算 2*c。',
+      '发射 opr 0 14，把结果输出到屏幕。',
+      '发射 opr 0 15，输出换行。'
+    ],
+    flowHighlight: '这一步特别适合给学生一个整体印象：一个高层语句 write(2*c)，最终在目标代码里被拆成了“表达式求值 + 输出动作 + 格式控制”三部分。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '由 p 使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '循环控制', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '已参与 2*c 输出', state: 'active' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '循环体中调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 ?', explain: '若条件不满足则跳出循环，出口待回填', state: 'generated' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'generated' },
+      { addr: 16, ins: 'lit 0 2', explain: '把 2 压栈', state: 'generated' },
+      { addr: 17, ins: 'lod 0 4', explain: '读取 c', state: 'generated' },
+      { addr: 18, ins: 'opr 0 4', explain: '做乘法，得到 2*c', state: 'current' },
+      { addr: 19, ins: 'opr 0 14', explain: '输出栈顶结果', state: 'current' },
+      { addr: 20, ins: 'opr 0 15', explain: '输出换行', state: 'current' }
+    ],
+    bridgeLeft: ['表达式值已求出', 'write 语义转为输出动作'],
+    bridgeRight: ['连续发射三条指令', '形成完整输出行为'],
+    footer: '有时学生会觉得“write 就是输出一条指令”，其实编译器常常要展开成多条微动作。'
+  },
+  {
+    title: '翻译循环体中的第二个 read(b)，再次生成输入与存储',
+    scanLine: 12,
+    scope: '主程序 BLOCK，循环体末尾重新读入 b',
+    action: '循环体最后还有一个 read(b)。和前面第一次 read(b) 的翻译模式完全相同，先生成 opr 0 16，再生成 sto 0 3。',
+    result: 'code[21] = opr 0 16，code[22] = sto 0 3。',
+    lev: 0, dx: 5, cx: 23,
+    tx: 4,
+    sourceTouched: [12],
+    focusTags: [ ['orange','重复模板'], ['blue','read再次出现'] ],
+    flow: [
+      '遇到循环体末尾的 read(b)。',
+      '先发射输入指令 opr 0 16。',
+      '再查表生成 sto 0 3，把结果存回 b。'
+    ],
+    flowHighlight: '这一段很有教学价值，因为它让学生看到：相同的源结构，会在目标代码中重复展开为相同的模板。编译器不是“记住结果”，而是按规则再次生成。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '由 p 使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '本步再次作为 read 目标', state: 'active' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '上一语句输出使用', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '循环体中调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '第一次读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '第一次存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 ?', explain: '若条件不满足则跳出循环，出口待回填', state: 'generated' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'generated' },
+      { addr: 16, ins: 'lit 0 2', explain: '把 2 压栈', state: 'generated' },
+      { addr: 17, ins: 'lod 0 4', explain: '读取 c', state: 'generated' },
+      { addr: 18, ins: 'opr 0 4', explain: '做乘法，得到 2*c', state: 'generated' },
+      { addr: 19, ins: 'opr 0 14', explain: '输出结果', state: 'generated' },
+      { addr: 20, ins: 'opr 0 15', explain: '输出换行', state: 'generated' },
+      { addr: 21, ins: 'opr 0 16', explain: '再次读入输入到栈顶', state: 'current' },
+      { addr: 22, ins: 'sto 0 3', explain: '再次存入 b', state: 'current' }
+    ],
+    bridgeLeft: ['第二个 read(b) 被识别', '结构与前面完全相同'],
+    bridgeRight: ['再次生成同样的代码模板', '体现规则重复应用'],
+    footer: '这一步对学生理解“语法制导翻译”的重复性很有帮助。'
+  },
+  {
+    title: '循环体结束，生成 jmp 0 11 回跳到 while 条件入口',
+    scanLine: 13,
+    scope: '主程序 BLOCK，while 循环体结束',
+    action: '循环体编译完成后，编译器生成 jmp 0 11，跳回之前记录的循环入口 cx1 = 11，重新判断 b # 0。',
+    result: 'code[23] = jmp 0 11。',
+    lev: 0, dx: 5, cx: 24,
+    tx: 4,
+    sourceTouched: [13],
+    focusTags: [ ['blue','回跳循环入口'], ['orange','生成jmp'] ],
+    flow: [
+      '循环体所有语句都已翻译完。',
+      '利用一开始保存的 cx1 = 11。',
+      '生成 jmp 0 11，形成闭环。'
+    ],
+    flowHighlight: 'while 之所以成为循环，不是因为源代码写了 while 两个字，而是因为目标代码层面真的形成了“前有条件跳出，后有无条件回跳”的闭环。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '由 p 使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '通过回跳再次判断', state: 'active' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '由 p 修改、被 write 输出', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '循环体中调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '第一次读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '第一次存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 ?', explain: '若条件不满足则跳出循环，出口待回填', state: 'generated' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'generated' },
+      { addr: 16, ins: 'lit 0 2', explain: '把 2 压栈', state: 'generated' },
+      { addr: 17, ins: 'lod 0 4', explain: '读取 c', state: 'generated' },
+      { addr: 18, ins: 'opr 0 4', explain: '做乘法，得到 2*c', state: 'generated' },
+      { addr: 19, ins: 'opr 0 14', explain: '输出结果', state: 'generated' },
+      { addr: 20, ins: 'opr 0 15', explain: '输出换行', state: 'generated' },
+      { addr: 21, ins: 'opr 0 16', explain: '再次读入输入', state: 'generated' },
+      { addr: 22, ins: 'sto 0 3', explain: '再次存入 b', state: 'generated' },
+      { addr: 23, ins: 'jmp 0 11', explain: '回跳到 while 条件入口', state: 'current' }
+    ],
+    bridgeLeft: ['循环体编译结束', '利用先前记录的循环入口位置'],
+    bridgeRight: ['发射回跳 jmp', '构成循环后沿'],
+    footer: '这一行和前面的 jpc 配合起来，学生就能看到 while 在目标代码层面是如何被“搭骨架”的。'
+  },
+  {
+    title: 'while 整体结束，回填 jpc 的出口地址为 24',
+    scanLine: 13,
+    scope: '主程序 BLOCK，完成 while 控制流回填',
+    action: '现在循环体后的下一条指令地址已经知道是 24，因此把先前占位的 code[14] 回填为 jpc 0 24。',
+    result: 'code[14] = jpc 0 24。',
+    lev: 0, dx: 5, cx: 24,
+    tx: 4,
+    sourceTouched: [8,13],
+    focusTags: [ ['purple','回填jpc'], ['blue','循环出口确定'] ],
+    flow: [
+      '整个 while 语句翻译完毕。',
+      '此时下一条代码位置 cx = 24，就是循环出口。',
+      '回到 code[14]，把 jpc 的目标地址改成 24。'
+    ],
+    flowHighlight: '这一步把 while 的控制流结构彻底闭合了：条件失败时跳到 24，条件成功时进入循环体，体末尾再跳回 11。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '由 p 使用', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '循环控制变量', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '循环体中的结果变量', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '已可被调用', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '过程 p 的入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟空间', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取 b', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '取常量 10', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '做加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '写回 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟空间', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '第一次读入输入', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '第一次存入 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '取 b', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '把 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断 b # 0', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 24', explain: '条件不满足时跳到循环外', state: 'backpatched' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'generated' },
+      { addr: 16, ins: 'lit 0 2', explain: '把 2 压栈', state: 'generated' },
+      { addr: 17, ins: 'lod 0 4', explain: '读取 c', state: 'generated' },
+      { addr: 18, ins: 'opr 0 4', explain: '做乘法，得到 2*c', state: 'generated' },
+      { addr: 19, ins: 'opr 0 14', explain: '输出结果', state: 'generated' },
+      { addr: 20, ins: 'opr 0 15', explain: '输出换行', state: 'generated' },
+      { addr: 21, ins: 'opr 0 16', explain: '再次读入输入', state: 'generated' },
+      { addr: 22, ins: 'sto 0 3', explain: '再次存入 b', state: 'generated' },
+      { addr: 23, ins: 'jmp 0 11', explain: '回跳到 while 条件入口', state: 'generated' }
+    ],
+    bridgeLeft: ['循环外部的下一条地址已经知道', '先前的占位可以修正'],
+    bridgeRight: ['把 jpc 改写成 jpc 0 24', '控制流闭环彻底成形'],
+    footer: '到这里，整个 while 的目标代码已经非常完整地呈现出了“判断、退出、循环体、回跳”这四个部分。'
+  },
+  {
+    title: '主程序结束，BLOCK 自动补上 opr 0 0，整段目标代码生成完成',
+    scanLine: 14,
+    scope: '主程序 BLOCK，编译结束',
+    action: '主程序的 begin...end. 翻译完成后，BLOCK 在最末尾自动生成 opr 0 0，表示程序结束退栈。整个源程序的目标代码至此全部形成。',
+    result: 'code[24] = opr 0 0，完整 P-code 生成完毕。',
+    lev: 0, dx: 5, cx: 25,
+    tx: 4,
+    sourceTouched: [14],
+    focusTags: [ ['orange','生成结束指令'], ['blue','整段代码完成'] ],
+    flow: [
+      '主程序语句体 end. 已经翻译完。',
+      'BLOCK 在尾部自动补上一条 opr 0 0。',
+      '整个编译过程结束，code[] 与 table 都达到最终状态。'
+    ],
+    flowHighlight: '现在回头看整段过程，你会发现目标代码确实是在 BLOCK 的顺序扫描与递归调用中，一步一步长出来的：有些行当场生成，有些行先占位，之后再回填。',
+    symbols: [
+      { idx: 1, name: 'a', kind: 'const', level: 0, value: 10, addr: '-', note: '常量', state: '' },
+      { idx: 2, name: 'b', kind: 'var', level: 0, value: '-', addr: 3, note: '主程序变量', state: '' },
+      { idx: 3, name: 'c', kind: 'var', level: 0, value: '-', addr: 4, note: '主程序变量', state: '' },
+      { idx: 4, name: 'p', kind: 'proc', level: 0, value: '-', addr: 2, note: '过程入口', state: '' }
+    ],
+    code: [
+      { addr: 0, ins: 'jmp 0 8', explain: '转向主程序入口', state: 'generated' },
+      { addr: 1, ins: 'jmp 0 2', explain: '转向过程 p 入口', state: 'generated' },
+      { addr: 2, ins: 'int 0 3', explain: '过程 p 开辟 3 个栈单元', state: 'generated' },
+      { addr: 3, ins: 'lod 1 3', explain: '取变量 b 的值到栈顶', state: 'generated' },
+      { addr: 4, ins: 'lit 0 10', explain: '把常数 10 压栈', state: 'generated' },
+      { addr: 5, ins: 'opr 0 2', explain: '执行加法', state: 'generated' },
+      { addr: 6, ins: 'sto 1 4', explain: '把栈顶值送变量 c', state: 'generated' },
+      { addr: 7, ins: 'opr 0 0', explain: '过程返回调用点', state: 'generated' },
+      { addr: 8, ins: 'int 0 5', explain: '主程序开辟 5 个栈单元', state: 'generated' },
+      { addr: 9, ins: 'opr 0 16', explain: '从命令行读取值到栈顶', state: 'generated' },
+      { addr: 10, ins: 'sto 0 3', explain: '将栈顶值存入变量 b', state: 'generated' },
+      { addr: 11, ins: 'lod 0 3', explain: '将变量 b 的值取至栈顶', state: 'generated' },
+      { addr: 12, ins: 'lit 0 0', explain: '将常数 0 压栈', state: 'generated' },
+      { addr: 13, ins: 'opr 0 9', explain: '判断次栈顶与栈顶是否不等', state: 'generated' },
+      { addr: 14, ins: 'jpc 0 24', explain: '条件不满足则转向 24', state: 'generated' },
+      { addr: 15, ins: 'cal 0 2', explain: '调用过程 p', state: 'generated' },
+      { addr: 16, ins: 'lit 0 2', explain: '把常数 2 压栈', state: 'generated' },
+      { addr: 17, ins: 'lod 0 4', explain: '将变量 c 的值取至栈顶', state: 'generated' },
+      { addr: 18, ins: 'opr 0 4', explain: '次栈顶与栈顶相乘', state: 'generated' },
+      { addr: 19, ins: 'opr 0 14', explain: '栈顶值输出至屏幕', state: 'generated' },
+      { addr: 20, ins: 'opr 0 15', explain: '换行', state: 'generated' },
+      { addr: 21, ins: 'opr 0 16', explain: '再次从命令行读取值到栈顶', state: 'generated' },
+      { addr: 22, ins: 'sto 0 3', explain: '将栈顶值送变量 b', state: 'generated' },
+      { addr: 23, ins: 'jmp 0 11', explain: '无条件转到循环入口', state: 'generated' },
+      { addr: 24, ins: 'opr 0 0', explain: '程序结束退栈', state: 'current' }
+    ],
+    bridgeLeft: ['源程序扫描完成', '所有声明与语句都已转译'],
+    bridgeRight: ['补齐最后的结束指令', '形成完整 P-code'],
+    footer: '最终你能清楚看到三股信息流：源代码按顺序被扫描，符号表逐步积累中间语义，目标代码则在 BLOCK 的推进中一行行生长出来。'
+  }
+];
+
+const sourceWrap = document.getElementById('sourceWrap');
+const stepTitle = document.getElementById('stepTitle');
+const scanText = document.getElementById('scanText');
+const scopeText = document.getElementById('scopeText');
+const actionText = document.getElementById('actionText');
+const resultText = document.getElementById('resultText');
+const metaPills = document.getElementById('metaPills');
+const levValue = document.getElementById('levValue');
+const dxValue = document.getElementById('dxValue');
+const cxValue = document.getElementById('cxValue');
+const txValue = document.getElementById('txValue');
+const compilerFlow = document.getElementById('compilerFlow');
+const flowHighlight = document.getElementById('flowHighlight');
+const symbolBody = document.getElementById('symbolBody');
+const codeList = document.getElementById('codeList');
+const footerNote = document.getElementById('footerNote');
+const bridgeLeftLabel = document.getElementById('bridgeLeftLabel');
+const bridgeLeftDetail = document.getElementById('bridgeLeftDetail');
+const bridgeRightLabel = document.getElementById('bridgeRightLabel');
+const bridgeRightDetail = document.getElementById('bridgeRightDetail');
+const stepLabel = document.getElementById('stepLabel');
+const progressText = document.getElementById('progressText');
+const stepRange = document.getElementById('stepRange');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+let currentStep = 0;
+let playing = false;
+let timer = null;
+
+function badgeClass(type) {
+  if (type === 'keyword') return 'token-keyword';
+  if (type === 'ident') return 'token-ident';
+  if (type === 'emit') return 'token-emit';
+  if (type === 'fill') return 'token-fill';
+  return 'token-loop';
+}
+
+function createSource() {
+  sourceWrap.innerHTML = '';
+  sourceLines.forEach((line, idx) => {
+    const row = document.createElement('div');
+    row.className = 'source-line pending';
+    row.dataset.idx = idx;
+
+    const ln = document.createElement('div');
+    ln.className = 'ln';
+    ln.textContent = idx + 1;
+
+    const code = document.createElement('div');
+    code.className = 'code';
+    code.textContent = line.text;
+
+    line.badges.forEach(b => {
+      const [type, label] = b.split(':');
+      const span = document.createElement('span');
+      span.className = `token-badge ${badgeClass(type)}`;
+      span.textContent = label;
+      code.appendChild(span);
+    });
+
+    row.appendChild(ln);
+    row.appendChild(code);
+    sourceWrap.appendChild(row);
+  });
+}
+
+function render(stepIndex) {
+  const s = steps[stepIndex];
+  currentStep = stepIndex;
+
+  stepTitle.innerHTML = s.title;
+  scanText.innerHTML = `第 ${s.scanLine + 1} 行：<b>${sourceLines[s.scanLine].text.replace(/</g, '&lt;')}</b>`;
+  scopeText.innerHTML = s.scope;
+  actionText.innerHTML = s.action;
+  resultText.innerHTML = s.result;
+
+  metaPills.innerHTML = '';
+  s.focusTags.forEach(([cls, txt]) => {
+    const pill = document.createElement('div');
+    pill.className = `pill ${cls}`;
+    pill.textContent = txt;
+    metaPills.appendChild(pill);
+  });
+
+  levValue.textContent = s.lev;
+  dxValue.textContent = s.dx;
+  cxValue.textContent = s.cx;
+  txValue.textContent = s.tx;
+
+  [...sourceWrap.querySelectorAll('.source-line')].forEach((row, idx) => {
+    row.className = 'source-line';
+    if (idx === s.scanLine) row.classList.add('active');
+    if (s.sourceTouched.includes(idx)) row.classList.add('touched');
+    else row.classList.add('pending');
+  });
+
+  compilerFlow.innerHTML = '';
+  s.flow.forEach((txt, idx) => {
+    const row = document.createElement('div');
+    row.className = 'flow-step';
+    row.innerHTML = `<div class="num">${idx+1}</div><div class="txt">${txt}</div>`;
+    compilerFlow.appendChild(row);
+  });
+  flowHighlight.innerHTML = s.flowHighlight;
+
+  symbolBody.innerHTML = '';
+  s.symbols.forEach(sym => {
+    const tr = document.createElement('tr');
+    if (sym.state === 'active') tr.classList.add('active-row');
+    if (sym.state === 'new') tr.classList.add('new-row');
+
+    const kindTag = `<span class="tag ${sym.kind}">${sym.kind === 'const' ? 'const' : sym.kind === 'var' ? 'var' : 'proc'}</span>`;
+    tr.innerHTML = `
+      <td>${sym.idx}</td>
+      <td><b>${sym.name}</b></td>
+      <td>${kindTag}</td>
+      <td>${sym.level}</td>
+      <td>${sym.value}</td>
+      <td>${sym.addr}</td>
+      <td>${sym.note}</td>
+    `;
+    symbolBody.appendChild(tr);
+  });
+
+  codeList.innerHTML = '';
+  s.code.forEach(row => {
+    const div = document.createElement('div');
+    div.className = 'code-row generated';
+    if (row.state === 'current') div.classList.add('current');
+    if (row.state === 'backpatched') div.classList.add('backpatched');
+    div.innerHTML = `
+      <div class="addr">(${row.addr})</div>
+      <div class="ins">${row.ins}</div>
+      <div class="explain">${row.explain}</div>
+    `;
+    codeList.appendChild(div);
+  });
+
+  bridgeLeftLabel.innerHTML = `${s.bridgeLeft[0]}<br>${s.bridgeLeft[1]}`;
+  bridgeLeftDetail.innerHTML = '源代码局部片段被识别后，会变成符号信息或语句翻译动作';
+  bridgeRightLabel.innerHTML = `${s.bridgeRight[0]}<br>${s.bridgeRight[1]}`;
+  bridgeRightDetail.innerHTML = 'gen() 把这些语义决定写成一行行 P-code，并在必要时回填旧位置';
+
+  footerNote.innerHTML = s.footer;
+
+  stepLabel.textContent = `步骤 ${stepIndex + 1}`;
+  progressText.textContent = `${stepIndex + 1} / ${steps.length}`;
+  stepRange.value = stepIndex;
+}
+
+function nextStep() {
+  if (currentStep < steps.length - 1) {
+    render(currentStep + 1);
+  } else {
+    stopPlay();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 0) render(currentStep - 1);
+}
+
+function startPlay() {
+  if (playing) return;
+  playing = true;
+  playBtn.textContent = '暂停';
+  timer = setInterval(() => {
+    if (currentStep >= steps.length - 1) {
+      stopPlay();
+      return;
+    }
+    nextStep();
+  }, 1800);
+}
+
+function stopPlay() {
+  playing = false;
+  playBtn.textContent = '自动播放';
+  if (timer) clearInterval(timer);
+  timer = null;
+}
+
+prevBtn.addEventListener('click', () => { stopPlay(); prevStep(); });
+nextBtn.addEventListener('click', () => { stopPlay(); nextStep(); });
+resetBtn.addEventListener('click', () => { stopPlay(); render(0); });
+playBtn.addEventListener('click', () => {
+  if (playing) stopPlay();
+  else startPlay();
+});
+stepRange.addEventListener('input', e => {
+  stopPlay();
+  render(Number(e.target.value));
+});
+
+stepRange.max = steps.length - 1;
+createSource();
+render(0);
+</script>
+</body>
+</html>
